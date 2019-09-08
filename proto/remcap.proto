@@ -1,0 +1,18 @@
+syntax="proto3";
+
+package remcap;
+option go_package="remcappb";
+
+message Packet{
+    bytes data = 1;
+}
+
+message Summary{
+    int64   start_time = 1;
+    int64   end_time = 2;
+    int64   packets_captured = 3;
+}
+
+service RemCap{
+    rpc Sniff(stream Packet) returns(Summary);
+}
