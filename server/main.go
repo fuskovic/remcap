@@ -32,9 +32,12 @@ func (s *server) Sniff(stream remcappb.RemCap_SniffServer) error {
 		log.Printf(err)
 		return errors.New(err)
 	}
+	y, m, d := streamStarted.Date()
+	date := fmt.Sprintf("%d-%d-%d", m, d, y)
+	t := streamStarted.Format(time.Kitchen)
 
 	pcapsDir := filepath.Join(filepath.Dir(cf), "pcaps")
-	fileName := fmt.Sprintf("%s.pcap", streamStarted.String())
+	fileName := fmt.Sprintf("%s@%s.pcap", date, t)
 	path := filepath.Join(pcapsDir, fileName)
 
 	f, err := os.Create(path)
@@ -53,25 +56,37 @@ func (s *server) Sniff(stream remcappb.RemCap_SniffServer) error {
 		if err == io.EOF {
 			for index, packet := range packets {
 				if err := w.WritePacket(packet.Metadata().CaptureInfo, packet.Data()); err != nil {
-					log.Printf("failed to write packet %d to %s : %v\n", index, fileName, err)
+					log.Printf("Failed to write packet %d to %s : %v\n", index, fileName, err)
 					return err
 				}
 			}
 			log.Printf("%s successfully created\n", fileName)
-
-			return stream.SendAndClose(&remcappb.Summary{
+			if err := stream.SendAndClose(&remcappb.Summary{
 				StartTime:       streamStarted.Unix(),
 				EndTime:         time.Now().Unix(),
 				PacketsCaptured: int64(len(packets)),
-			})
+			}); err != nil {
+				log.Printf("Failed to send session summary : %v\n", err)
+				return err
+			}
+			break
 		}
 		if err != nil {
-			log.Printf("Error processing client stream : %v\n", err)
+			log.Printf("Stream error : %v\n", err)
 			return err
 		}
+
 		pkt := gopacket.NewPacket(req.GetData(), layers.LayerTypeEthernet, gopacket.Default)
+		capLen := len(req.GetData())
+		pkt.Metadata().CaptureInfo = gopacket.CaptureInfo{
+			Timestamp:      time.Now(),
+			CaptureLength:  capLen,
+			Length:         capLen,
+			InterfaceIndex: int(req.GetInterfaceIndex()),
+		}
 		packets = append(packets, pkt)
 	}
+	return nil
 }
 
 func main() {

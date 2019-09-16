@@ -6,13 +6,15 @@ Demonstrating gRPC client-streaming API for my blog by implementing a packet sni
 
 Todo :
 
--Implement Cobra CLI commands for :
+ - Fix bugs
+   - panicing on close of network interface channels
+   - pcap from previous session is generated on next session start (clear/reset server buffer on crash?)
 
- - Setting Berkely Packet Filter
- - Setting session duration
+- Add flag cli flag to configure host gRPC server
 
--Track Session duration
+- Add unit-tests for client and server and test for race-conditions, memory-leaks, 
+  and proper closing of resources etc...
 
--Stream EOF to server when session duration has elapsed.
+- Add Dockerfile and Makefile
     
 
