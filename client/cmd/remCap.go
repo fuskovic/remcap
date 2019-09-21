@@ -49,10 +49,8 @@ for a specified period of time.`,
 				return
 			}
 			if d < minTime {
-				fmt.Printf("\nInvalid session duration : %v\nSession must be at least 30s long%s\n", d, help)
-				return
+				log.Fatalf("\nInvalid session duration : %v\nSession must be at least 30s long%s\n", d, help)
 			}
-			log.Printf("Session duration set for : %v\n", d)
 			SeshDuration = d
 		},
 	}

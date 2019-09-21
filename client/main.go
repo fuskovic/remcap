@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -26,7 +25,7 @@ func init() {
 	bpf = cmd.BPF
 }
 
-func sniff(d string, pc chan gopacket.Packet, t time.Timer) {
+func sniff(d string, pc chan<- gopacket.Packet, tc <-chan time.Time) {
 	handle, err := pcap.OpenLive(d, maxSize, true, timeOut)
 	if err != nil {
 		log.Fatalf("failed to listen to %s : %v\n", d, err)
@@ -38,27 +37,39 @@ func sniff(d string, pc chan gopacket.Packet, t time.Timer) {
 	}
 
 	conn := gopacket.NewPacketSource(handle, handle.LinkType())
-	c := conn.Packets()
-	for range c {
+
+sniffer:
+	for {
 		select {
-		case <-t.C:
-			close(c)
-			break
-		case packet := <-c:
-			pc <- packet
+		case p := <-conn.Packets():
+			pc <- p
+		case <-tc:
+			break sniffer
 		}
 	}
 }
 
-func listen(pc chan gopacket.Packet, t time.Timer) error {
+func listen(pc chan gopacket.Packet, tc <-chan time.Time, done chan bool) error {
 	devices, err := pcap.FindAllDevs()
 	if err != nil {
 		log.Printf("Failed to identify network devices : %v\n", err)
 		return err
 	}
 
+	go func() {
+	validator:
+		for {
+			select {
+			case <-tc:
+				done <- true
+				break validator
+			}
+		}
+		return
+	}()
+
 	for _, device := range devices {
-		go sniff(device.Name, pc, t)
+		go sniff(device.Name, pc, tc)
 	}
 	return nil
 }
@@ -78,38 +89,44 @@ func main() {
 
 	timer := time.NewTimer(seshTime)
 	pc := make(chan gopacket.Packet)
+	tc := timer.C
+	done := make(chan bool)
 
-	if err := listen(pc, *timer); err != nil {
+	if err := listen(pc, tc, done); err != nil {
 		log.Fatalf("Failed to listen to network interfaces : %v\n", err)
 	}
 
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{}
 
+main_proc:
 	for {
+	sub_proc:
 		select {
-		case <-timer.C:
-			close(pc)
-			summary, err := stream.CloseAndRecv()
-			if err != nil {
-				log.Fatalf("Failed to receive summary on close")
+		case p := <-pc:
+			if err := gopacket.SerializePacket(buf, opts, p); err != nil {
+				log.Printf("failed to serialize packet : %v\n", err)
+				break sub_proc
 			}
-			startTime := time.Unix(summary.GetStartTime(), 0)
-			endTime := time.Unix(summary.GetEndTime(), 0)
-			pktsCaptured := summary.GetPacketsCaptured()
-			fmt.Printf("Session completed\nstart : %s\nend : %s\nPackets captured : %d\n", startTime, endTime, pktsCaptured)
-			break
-		case packet := <-pc:
-			if err := gopacket.SerializePacket(buf, opts, packet); err != nil {
-				log.Fatalf("failed to serialize packet : %v\n", err)
-			}
-			ii := int32(packet.Metadata().InterfaceIndex)
+			ii := int32(p.Metadata().InterfaceIndex)
 			if err := stream.Send(&remcappb.Packet{
 				Data:           buf.Bytes(),
 				InterfaceIndex: ii,
 			}); err != nil {
-				log.Fatalf("failed to stream packet : %v\n", err)
+				log.Printf("failed to stream packet : %v\n", err)
+				break sub_proc
 			}
+		case <-done:
+			summary, err := stream.CloseAndRecv()
+			if err != nil {
+				log.Printf("Failed to receive summary on close")
+				break main_proc
+			}
+			startTime := time.Unix(summary.GetStartTime(), 0)
+			endTime := time.Unix(summary.GetEndTime(), 0)
+			pktsCaptured := summary.GetPacketsCaptured()
+			log.Printf("Session completed\nstart : %s\nend : %s\nPackets captured : %d\n", startTime, endTime, pktsCaptured)
+			break main_proc
 		}
 	}
 }
