@@ -6,6 +6,7 @@ option go_package="remcappb";
 message Packet{
     bytes data = 1;
     int32 interface_index = 2;
+    string extIP = 3;
 }
 
 message Summary{

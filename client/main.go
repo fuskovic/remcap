@@ -12,6 +12,7 @@ import (
 	remcappb "github.com/fuskovic/rem-cap/proto"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
+	"github.com/polds/MyIP"
 	"google.golang.org/grpc"
 )
 
@@ -21,6 +22,7 @@ var (
 	timeOut    time.Duration
 	seshTime   time.Duration
 	bpf        string
+	ip         string
 )
 
 func init() {
@@ -30,6 +32,11 @@ func init() {
 	netDevices = cmd.NetworkDevices
 	timeOut = 30 * time.Second
 	maxSize = 65535
+	addr, err := myip.GetMyIP()
+	if err != nil {
+		log.Printf("failed to get this ip : %v\n", err)
+	}
+	ip = addr
 }
 
 func filterSpecified() bool {
@@ -149,6 +156,8 @@ func listen(pc chan gopacket.Packet, t time.Timer, done chan bool) error {
 }
 
 func main() {
+	fmt.Println(ip)
+
 	conn, err := grpc.Dial(":50051", grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("failed to establish connection with gRPC server : %v\n", err)
@@ -176,6 +185,7 @@ main_proc:
 		case p := <-pc:
 			ii := int32(p.Metadata().InterfaceIndex)
 			if err := stream.Send(&remcappb.Packet{
+				ExtIP:          ip,
 				Data:           p.Data(),
 				InterfaceIndex: ii,
 			}); err == io.EOF {
