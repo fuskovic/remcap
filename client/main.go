@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"time"
 
@@ -13,16 +14,20 @@ import (
 )
 
 var (
-	maxSize  int32 = 65535
-	timeOut        = 30 * time.Second
-	seshTime time.Duration
-	bpf      string
+	netDevices []string
+	maxSize    int32
+	timeOut    time.Duration
+	seshTime   time.Duration
+	bpf        string
 )
 
 func init() {
 	cmd.Execute()
 	seshTime = cmd.SeshDuration
 	bpf = cmd.BPF
+	netDevices = cmd.NetworkDevices
+	timeOut = 30 * time.Second
+	maxSize = 65535
 }
 
 func sniff(d string, pc chan<- gopacket.Packet, tc <-chan time.Time) {
@@ -50,10 +55,15 @@ sniffer:
 }
 
 func listen(pc chan gopacket.Packet, tc <-chan time.Time, done chan bool) error {
-	devices, err := pcap.FindAllDevs()
-	if err != nil {
-		log.Printf("Failed to identify network devices : %v\n", err)
-		return err
+	if len(netDevices) == 0 {
+		devices, err := pcap.FindAllDevs()
+		if err != nil {
+			log.Printf("Failed to identify network devices : %v\n", err)
+			return err
+		}
+		for _, d := range devices {
+			netDevices = append(netDevices, d.Name)
+		}
 	}
 
 	go func() {
@@ -68,9 +78,10 @@ func listen(pc chan gopacket.Packet, tc <-chan time.Time, done chan bool) error 
 		return
 	}()
 
-	for _, device := range devices {
-		go sniff(device.Name, pc, tc)
+	for _, nd := range netDevices {
+		go sniff(nd, pc, tc)
 	}
+
 	return nil
 }
 
@@ -96,23 +107,19 @@ func main() {
 		log.Fatalf("Failed to listen to network interfaces : %v\n", err)
 	}
 
-	buf := gopacket.NewSerializeBuffer()
-	opts := gopacket.SerializeOptions{}
-
 main_proc:
 	for {
 	sub_proc:
 		select {
 		case p := <-pc:
-			if err := gopacket.SerializePacket(buf, opts, p); err != nil {
-				log.Printf("failed to serialize packet : %v\n", err)
-				break sub_proc
-			}
 			ii := int32(p.Metadata().InterfaceIndex)
 			if err := stream.Send(&remcappb.Packet{
-				Data:           buf.Bytes(),
+				Data:           p.Data(),
 				InterfaceIndex: ii,
-			}); err != nil {
+			}); err == io.EOF {
+				log.Println("premature stream close")
+				break main_proc
+			} else if err != nil {
 				log.Printf("failed to stream packet : %v\n", err)
 				break sub_proc
 			}

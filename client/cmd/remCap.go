@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	NetworkDevices          []string
 	seconds, minutes, hours int64
 	SeshDuration            time.Duration
 	minTime                 = 5 * time.Second
@@ -19,18 +20,18 @@ and sends network traffic information to a remote host
 for a specified period of time.
 
 Usage:
-  remcap [flags]
-  remcap [command]
+  remcap [flags] [command]
 
 Available Commands:
   bpf         Apply Berkely Packet Filters
   help        Help about any command
 
 Flags:
-  -h, --help          help for remcap
-  -r, --hours int     Amount of hours to run capture
-  -m, --minutes int   Amount of minutes to run capture
-  -s, --seconds int   Amount of seconds to run capture
+  -h, --help          		help for remcap
+  -r, --hours int     		Amount of hours to run capture
+  -m, --minutes int   		Amount of minutes to run capture
+  -s, --seconds int   		Amount of seconds to run capture
+  -d, --devices strings		Designated interfaces to sniff
 
 Use "remcap [command] --help" for more information about a command.`
 
@@ -49,7 +50,7 @@ for a specified period of time.`,
 				return
 			}
 			if d < minTime {
-				log.Fatalf("\nInvalid session duration : %v\nSession must be at least 30s long%s\n", d, help)
+				log.Fatalf("\nInvalid session duration : %v\nSession must be at least 5s long%s\n", d, help)
 			}
 			SeshDuration = d
 		},
@@ -64,4 +65,5 @@ func init() {
 	remCap.PersistentFlags().Int64VarP(&seconds, "seconds", "s", 0, "Amount of seconds to run capture")
 	remCap.PersistentFlags().Int64VarP(&minutes, "minutes", "m", 0, "Amount of minutes to run capture")
 	remCap.PersistentFlags().Int64VarP(&hours, "hours", "r", 0, "Amount of hours to run capture")
+	remCap.PersistentFlags().StringSliceVarP(&NetworkDevices, "devices", "d", NetworkDevices, "network interface names")
 }
