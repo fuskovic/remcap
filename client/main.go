@@ -21,8 +21,7 @@ var (
 	maxSize    int32
 	timeOut    time.Duration
 	seshTime   time.Duration
-	bpf        string
-	ip         string
+	bpf, ip    string
 )
 
 func init() {
