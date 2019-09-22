@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/fuskovic/rem-cap/client/cmd"
@@ -30,6 +32,69 @@ func init() {
 	maxSize = 65535
 }
 
+func filterSpecified() bool {
+	return len(bpf) > 0
+}
+
+func devicesDesignated(n int) bool {
+	return n > 0
+}
+
+func getNetInterfaces() (int, error) {
+	if len(netDevices) == 0 {
+		devices, err := pcap.FindAllDevs()
+		if err != nil {
+			log.Printf("Failed to identify network devices : %v\n", err)
+			return 0, err
+		}
+		for _, d := range devices {
+			netDevices = append(netDevices, d.Name)
+		}
+		return 0, nil
+	}
+	return len(netDevices), nil
+}
+
+func logProgress(t time.Timer, pc chan gopacket.Packet) {
+	startTime := time.Now()
+
+	go func() {
+	time_logger:
+		for {
+			select {
+			case <-t.C:
+				break time_logger
+			}
+		}
+	}()
+
+	for {
+		elapsedTime := time.Since(startTime)
+		h, m, s := int(elapsedTime.Hours()), int(elapsedTime.Minutes()), int(elapsedTime.Seconds())
+		time.Sleep(1 * time.Second)
+		fmt.Printf("\r%s", strings.Repeat(" ", 25))
+		fmt.Printf("\rprogress : %dh-%dm-%ds/%v", h, m, s, seshTime)
+	}
+}
+
+func logSessionStart(t time.Timer, pc chan gopacket.Packet, n int) {
+	log.Println("session initialized")
+
+	if filterSpecified() {
+		log.Printf("filter specified : %s\n", bpf)
+	} else {
+		log.Println("no filter specified")
+	}
+
+	if devicesDesignated(n) {
+		log.Printf("sniffing : %v\n", netDevices)
+	} else {
+		log.Println("no device(s) specified - sniffing all")
+	}
+
+	go logProgress(t, pc)
+}
+
 func sniff(d string, pc chan<- gopacket.Packet, tc <-chan time.Time) {
 	handle, err := pcap.OpenLive(d, maxSize, true, timeOut)
 	if err != nil {
@@ -54,29 +119,27 @@ sniffer:
 	}
 }
 
-func listen(pc chan gopacket.Packet, tc <-chan time.Time, done chan bool) error {
-	if len(netDevices) == 0 {
-		devices, err := pcap.FindAllDevs()
-		if err != nil {
-			log.Printf("Failed to identify network devices : %v\n", err)
-			return err
-		}
-		for _, d := range devices {
-			netDevices = append(netDevices, d.Name)
-		}
-	}
+func listen(pc chan gopacket.Packet, t time.Timer, done chan bool) error {
+	tc := t.C
 
 	go func() {
-	validator:
+	listener:
 		for {
 			select {
 			case <-tc:
 				done <- true
-				break validator
+				break listener
 			}
 		}
 		return
 	}()
+
+	numDesignated, err := getNetInterfaces()
+	if err != nil {
+		return err
+	}
+
+	logSessionStart(t, pc, numDesignated)
 
 	for _, nd := range netDevices {
 		go sniff(nd, pc, tc)
@@ -100,10 +163,9 @@ func main() {
 
 	timer := time.NewTimer(seshTime)
 	pc := make(chan gopacket.Packet)
-	tc := timer.C
 	done := make(chan bool)
 
-	if err := listen(pc, tc, done); err != nil {
+	if err := listen(pc, *timer, done); err != nil {
 		log.Fatalf("Failed to listen to network interfaces : %v\n", err)
 	}
 
@@ -131,8 +193,15 @@ main_proc:
 			}
 			startTime := time.Unix(summary.GetStartTime(), 0)
 			endTime := time.Unix(summary.GetEndTime(), 0)
+			elapsedTime := endTime.Sub(startTime)
 			pktsCaptured := summary.GetPacketsCaptured()
-			log.Printf("Session completed\nstart : %s\nend : %s\nPackets captured : %d\n", startTime, endTime, pktsCaptured)
+			fmt.Printf(`
+Capture session terminated
+start : %s
+end : %s
+elapsed : %v
+Packets captured : %d
+`, startTime, endTime, elapsedTime, pktsCaptured)
 			break main_proc
 		}
 	}
