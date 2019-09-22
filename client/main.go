@@ -36,7 +36,7 @@ func init() {
 	if err != nil {
 		log.Printf("failed to get this ip : %v\n", err)
 	}
-	ip = addr
+	ip = strings.ReplaceAll(addr, " ", "")
 }
 
 func filterSpecified() bool {
@@ -156,8 +156,6 @@ func listen(pc chan gopacket.Packet, t time.Timer, done chan bool) error {
 }
 
 func main() {
-	fmt.Println(ip)
-
 	conn, err := grpc.Dial(":50051", grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("failed to establish connection with gRPC server : %v\n", err)
@@ -185,9 +183,9 @@ main_proc:
 		case p := <-pc:
 			ii := int32(p.Metadata().InterfaceIndex)
 			if err := stream.Send(&remcappb.Packet{
-				ExtIP:          ip,
 				Data:           p.Data(),
 				InterfaceIndex: ii,
+				ExtIP:          ip,
 			}); err == io.EOF {
 				log.Println("premature stream close")
 				break main_proc
