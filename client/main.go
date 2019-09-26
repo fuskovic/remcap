@@ -17,11 +17,10 @@ import (
 )
 
 var (
-	netDevices []string
-	maxSize    int32
-	timeOut    time.Duration
-	seshTime   time.Duration
-	bpf, ip    string
+	netDevices        []string
+	maxSize           int32
+	timeOut, seshTime time.Duration
+	bpf, ip           string
 )
 
 func init() {

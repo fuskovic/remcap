@@ -13,52 +13,29 @@ var (
 	seconds, minutes, hours int64
 	SeshDuration            time.Duration
 	minTime                 = 5 * time.Second
-	help                    = `
-
-Remcap is a packet capturing tool that records 
-and sends network traffic information to a remote host 
-for a specified period of time.
-
-Usage:
-  remcap [flags] [command]
-
-Available Commands:
-  bpf         Apply Berkely Packet Filters
-  help        Help about any command
-
-Flags:
-  -h, --help          		help for remcap
-  -r, --hours int     		Amount of hours to run capture
-  -m, --minutes int   		Amount of minutes to run capture
-  -s, --seconds int   		Amount of seconds to run capture
-  -d, --devices strings		Designated interfaces to sniff
-
-Use "remcap [command] --help" for more information about a command.`
-
-	remCap = &cobra.Command{
+	remCap                  = &cobra.Command{
 		Use:   "remcap",
 		Short: "Remote Packet Capture",
-		Long: `
-Remcap is a packet capturing tool that records 
-and sends network traffic information to a remote host 
-for a specified period of time.`,
-		Run: func(cmd *cobra.Command, input []string) {
+		Long:  `Remcap is a remote network monitoring tool.`,
+		RunE: func(cmd *cobra.Command, input []string) error {
 			args := fmt.Sprintf("%dh%dm%ds", hours, minutes, seconds)
 			d, err := time.ParseDuration(args)
 			if err != nil {
-				fmt.Printf("\n%v%s\n", err, help)
-				return
+				return err
 			}
 			if d < minTime {
-				log.Fatalf("\nInvalid session duration : %v\nSession must be at least 5s long%s\n", d, help)
+				return fmt.Errorf("Invalid session duration : %v - Session must be at least 5s long\n", d)
 			}
 			SeshDuration = d
+			return nil
 		},
 	}
 )
 
 func Execute() {
-	remCap.Execute()
+	if err := remCap.Execute(); err != nil {
+		log.Fatalf("....remcap exiting")
+	}
 }
 
 func init() {
