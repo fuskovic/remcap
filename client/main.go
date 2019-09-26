@@ -20,7 +20,7 @@ var (
 	netDevices        []string
 	maxSize           int32
 	timeOut, seshTime time.Duration
-	bpf, ip           string
+	bpf, ip, host     string
 )
 
 func init() {
@@ -35,6 +35,7 @@ func init() {
 		log.Printf("failed to get this ip : %v\n", err)
 	}
 	ip = strings.ReplaceAll(addr, " ", "")
+	host = cmd.Host
 }
 
 func filterSpecified() bool {
@@ -154,7 +155,7 @@ func listen(pc chan gopacket.Packet, t time.Timer, done chan bool) error {
 }
 
 func main() {
-	conn, err := grpc.Dial(":50051", grpc.WithInsecure())
+	conn, err := grpc.Dial(host, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("failed to establish connection with gRPC server : %v\n", err)
 	}

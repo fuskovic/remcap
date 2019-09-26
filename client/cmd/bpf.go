@@ -18,10 +18,13 @@ var (
 			if len(args) == 0 {
 				return fmt.Errorf("No filters specified")
 			}
-			BPF = strings.Join(args, " ")
-			if err := getSeshTime(); err != nil{
+			if err := getSeshTime(); err != nil {
 				return err
 			}
+			if err := setHost(); err != nil {
+				return err
+			}
+			BPF = strings.Join(args, " ")
 			return nil
 		},
 	}
