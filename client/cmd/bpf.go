@@ -19,6 +19,9 @@ var (
 				return fmt.Errorf("No filters specified")
 			}
 			BPF = strings.Join(args, " ")
+			if err := getSeshTime(); err != nil{
+				return err
+			}
 			return nil
 		},
 	}
