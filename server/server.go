@@ -6,6 +6,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/fuskovic/rem-cap/server/cmd"
+
 	remcappb "github.com/fuskovic/rem-cap/proto"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -40,10 +42,11 @@ func (s *server) sendSummary(c connection, stream remcappb.RemCap_SniffServer, s
 	defer f.Close()
 
 	w := pcapgo.NewWriter(f)
-	w.WriteFileHeader(655535, layers.LinkTypeEthernet)
+	w.WriteFileHeader(65535, layers.LinkTypeEthernet)
 
 	c.end = time.Now()
-	sc <- *c.updateStatus(false)
+	c.isConnected = false
+	sc <- c
 
 	for index, p := range c.packets {
 		if err := w.WritePacket(p.Metadata().CaptureInfo, p.Data()); err != nil {
@@ -72,7 +75,7 @@ func (s *server) Sniff(stream remcappb.RemCap_SniffServer) error {
 		start: time.Now(),
 	}
 
-	if err := c.createPCAP(); err != nil {
+	if err := c.createPCAP(cmd.Out); err != nil {
 		log.Fatalf("failed to create pcap for %s : %v\n", c.IP, err)
 	}
 
@@ -86,13 +89,15 @@ func (s *server) Sniff(stream remcappb.RemCap_SniffServer) error {
 		} else if err != nil {
 			ip := net.ParseIP(req.GetExtIP()).String()
 			log.Printf("Stream error - %s has disconnected: %v\n", ip, err)
-			status <- *c.updateStatus(false)
+			c.isConnected = false
+			status <- c
 			return err
 		}
 		c.IP = req.GetExtIP()
 		ii := int(req.GetInterfaceIndex())
 		c.addPacket(req.GetData(), layers.LayerTypeEthernet, gopacket.Default, ii)
-		status <- *c.updateStatus(true)
+		c.isConnected = true
+		status <- c
 	}
 	return nil
 }

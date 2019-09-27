@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/exec"
+	"runtime"
+	"time"
 
 	remcappb "github.com/fuskovic/rem-cap/proto"
 	"github.com/fuskovic/rem-cap/server/cmd"
@@ -18,10 +22,38 @@ func init() {
 	port = fmt.Sprintf(":%s", cmd.Port)
 }
 
+func clear() {
+	var cmd *exec.Cmd
+	run := true
+	system := runtime.GOOS
+
+	switch system {
+	case "darwin":
+		cmd = exec.Command("clear")
+	case "linux":
+		cmd = exec.Command("clear")
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "cls")
+	default:
+		log.Printf("Clear function not supported on current OS: %s\n", system)
+		run = false
+	}
+	if run {
+		cmd.Stdout = os.Stdout
+		cmd.Run()
+	}
+}
+
+func formatStamp(t time.Time) string {
+	y, m, d := t.Date()
+	stamp := fmt.Sprintf("%d/%d/%d-%v", m, d, y, t.UTC())
+	return stamp
+}
+
 func main() {
 	lis, err := net.Listen("tcp", port)
 	if err != nil {
-		log.Fatalf("Failed to listen on 50051 : %v\n", err)
+		log.Fatalf("Failed to listen on port %s : %v\n", port, err)
 	}
 
 	rcServer := grpc.NewServer()

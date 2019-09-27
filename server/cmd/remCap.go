@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	Port string
+	Port, Out string
 
 	remCap = &cobra.Command{
 		Use:   "remcap",
@@ -46,6 +46,7 @@ func Execute() {
 }
 
 func init() {
-	remCap.PersistentFlags().StringVar(&Port, "port", "", "Port to start Remcap server ex : --port 4444")
+	remCap.PersistentFlags().StringVarP(&Port, "port", "p", "", "Port to start Remcap server ex : --port 4444")
+	remCap.PersistentFlags().StringVarP(&Out, "out", "o", "", "Specify out file")
 	remCap.MarkFlagRequired("port")
 }
