@@ -80,12 +80,15 @@ func (c *connection) logStats() {
 	if !c.isConnected {
 		end = formatStamp(c.end)
 	}
+	stat := func(stat string, value interface{}) string {
+		return fmt.Sprintf("%s : %v", stat, value)
+	}
 
-	fmt.Printf(strings.Join([]string{
-		fmt.Sprintf("client-ip : %s\n", c.IP),
-		fmt.Sprintf("currently-conected : %t\n", c.isConnected),
-		fmt.Sprintf("start-time : %s\n", start),
-		fmt.Sprintf("end-time : %s\n", end),
-		fmt.Sprintf("pkts-captured : %d\n", c.pktsCaptured),
-	}, ""))
+	fmt.Println(strings.Join([]string{
+		stat("client-ip", c.IP),
+		stat("currently-conected", c.isConnected),
+		stat("start-time", start),
+		stat("end-time", end),
+		stat("pkts-captured", c.pktsCaptured),
+	}, "\n"))
 }

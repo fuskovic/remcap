@@ -23,31 +23,24 @@ func init() {
 }
 
 func clear() {
-	var cmd *exec.Cmd
-	run := true
+	e := &exec.Cmd{ Stdout: os.Stdout }
 	system := runtime.GOOS
-
-	switch system {
-	case "darwin":
-		cmd = exec.Command("clear")
-	case "linux":
-		cmd = exec.Command("clear")
-	case "windows":
-		cmd = exec.Command("cmd", "/c", "cls")
-	default:
+	if system == "linux" || system == "darwin" {
+		e = exec.Command("clear")
+	}else if system == "windows"{
+		e = exec.Command("cmd", "/c", "cls")
+	}else{
 		log.Printf("Clear function not supported on current OS: %s\n", system)
-		run = false
+		return
 	}
-	if run {
-		cmd.Stdout = os.Stdout
-		cmd.Run()
+	if err := e.Run(); err != nil{
+		log.Printf("Failed to clear stdout")
 	}
 }
 
 func formatStamp(t time.Time) string {
 	y, m, d := t.Date()
-	stamp := fmt.Sprintf("%d/%d/%d-%v", m, d, y, t.UTC())
-	return stamp
+	return fmt.Sprintf("%d/%d/%d-%v", m, d, y, t.UTC())
 }
 
 func main() {

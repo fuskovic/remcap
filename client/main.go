@@ -202,14 +202,21 @@ main_proc:
 			endTime := time.Unix(summary.GetEndTime(), 0)
 			elapsedTime := endTime.Sub(startTime)
 			pktsCaptured := summary.GetPacketsCaptured()
-			fmt.Printf(`
-Capture session terminated
-start : %s
-end : %s
-elapsed : %v
-Packets captured : %d
-`, startTime, endTime, elapsedTime, pktsCaptured)
+			printSummary(startTime, endTime, elapsedTime, pktsCaptured)
 			break main_proc
 		}
 	}
+}
+
+func printSummary(start, end time.Time, elapsed time.Duration, captured int64) {
+	stat := func(stat string, value interface{}) string {
+		return fmt.Sprintf("%s : %v", stat, value)
+	}
+	fmt.Println(strings.Join([]string{
+		"Capture session terminated",
+		stat("start", start),
+		stat("end", end),
+		stat("elapsed", elapsed),
+		stat("pkts captured", captured),
+	}, "\n"))
 }
