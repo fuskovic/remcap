@@ -23,17 +23,18 @@ func init() {
 }
 
 func clear() {
-	e := &exec.Cmd{ Stdout: os.Stdout }
+	var e *exec.Cmd
 	system := runtime.GOOS
 	if system == "linux" || system == "darwin" {
 		e = exec.Command("clear")
-	}else if system == "windows"{
+	} else if system == "windows" {
 		e = exec.Command("cmd", "/c", "cls")
-	}else{
+	} else {
 		log.Printf("Clear function not supported on current OS: %s\n", system)
 		return
 	}
-	if err := e.Run(); err != nil{
+	e.Stdout = os.Stdout
+	if err := e.Run(); err != nil {
 		log.Printf("Failed to clear stdout")
 	}
 }
