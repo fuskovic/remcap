@@ -41,19 +41,12 @@ func (c *connection) addPacket(data []byte, layer gopacket.LayerType, opts gopac
 	c.pktsCaptured++
 }
 
-func (c *connection) setDefaultOut() {
-	y, m, d := c.start.Date()
-	date := fmt.Sprintf("%d-%d-%d", m, d, y)
-	t := c.start.Format(time.Kitchen)
-	c.pcap.fileName = fmt.Sprintf("%s@%s.pcap", date, t)
-}
-
 func (c *connection) createPCAP(out string) error {
 	_, cf, _, ok := runtime.Caller(0)
 	if !ok {
-		err := "Failed to evaluate caller file"
-		log.Printf(err)
-		return errors.New(err)
+		msg := "Failed to evaluate caller file"
+		log.Printf(msg)
+		return errors.New(msg)
 	}
 	pcapsDir := filepath.Join(filepath.Dir(cf), "pcaps")
 	if len(out) == 0 {
@@ -71,6 +64,13 @@ func (c *connection) createPCAP(out string) error {
 	}
 	c.pcap.file = f
 	return nil
+}
+
+func (c *connection) setDefaultOut() {
+	y, m, d := c.start.Date()
+	date := fmt.Sprintf("%d-%d-%d", m, d, y)
+	t := c.start.Format(time.Kitchen)
+	c.pcap.fileName = fmt.Sprintf("%s@%s.pcap", date, t)
 }
 
 func (c *connection) logStats() {
@@ -91,4 +91,9 @@ func (c *connection) logStats() {
 		stat("end-time", end),
 		stat("pkts-captured", c.pktsCaptured),
 	}, "\n"))
+}
+
+func formatStamp(t time.Time) string {
+	y, m, d := t.Date()
+	return fmt.Sprintf("%d/%d/%d-%v", m, d, y, t.UTC())
 }

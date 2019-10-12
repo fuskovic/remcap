@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
-	"os/exec"
-	"runtime"
-	"time"
+
+	"google.golang.org/grpc/credentials"
 
 	remcappb "github.com/fuskovic/rem-cap/proto"
 	"github.com/fuskovic/rem-cap/server/cmd"
@@ -15,46 +13,35 @@ import (
 	"google.golang.org/grpc"
 )
 
-var port string
+func configServer(isEnabled bool) *grpc.Server {
+	if isEnabled {
+		certFile := cmd.CertFile  //server.crt
+		keyFile := cmd.PrivateKey //server.pem
 
-func init() {
-	cmd.Execute()
-	port = fmt.Sprintf(":%s", cmd.Port)
-}
-
-func clear() {
-	var e *exec.Cmd
-	system := runtime.GOOS
-	if system == "linux" || system == "darwin" {
-		e = exec.Command("clear")
-	} else if system == "windows" {
-		e = exec.Command("cmd", "/c", "cls")
-	} else {
-		log.Printf("Clear function not supported on current OS: %s\n", system)
-		return
+		creds, err := credentials.NewServerTLSFromFile(certFile, keyFile)
+		if err != nil {
+			log.Fatalf("failed to load certificate and or key, err : %v\n", err)
+		}
+		opts := grpc.Creds(creds)
+		return grpc.NewServer(opts)
 	}
-	e.Stdout = os.Stdout
-	if err := e.Run(); err != nil {
-		log.Printf("Failed to clear stdout")
-	}
-}
-
-func formatStamp(t time.Time) string {
-	y, m, d := t.Date()
-	return fmt.Sprintf("%d/%d/%d-%v", m, d, y, t.UTC())
+	return grpc.NewServer()
 }
 
 func main() {
+	cmd.Execute()
+	port := fmt.Sprintf(":%s", cmd.Port)
+
 	lis, err := net.Listen("tcp", port)
 	if err != nil {
 		log.Fatalf("Failed to listen on port %s : %v\n", port, err)
 	}
 
-	rcServer := grpc.NewServer()
-	remcappb.RegisterRemCapServer(rcServer, &server{})
+	s := configServer(cmd.EnabledTLS)
+	remcappb.RegisterRemCapServer(s, &server{})
 
 	fmt.Printf("remcap server running on %s\n", port)
-	if err := rcServer.Serve(lis); err != nil {
+	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to start server : %v\n", err)
 	}
 }

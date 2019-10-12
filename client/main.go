@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"strings"
 	"time"
+
+	"google.golang.org/grpc/credentials"
 
 	"github.com/fuskovic/rem-cap/client/cmd"
 	remcappb "github.com/fuskovic/rem-cap/proto"
@@ -16,37 +19,22 @@ import (
 	"google.golang.org/grpc"
 )
 
-var (
-	netDevices        []string
-	maxSize           int32
-	timeOut, seshTime time.Duration
-	bpf, ip, host     string
-)
+func getOpts(isEnabled bool) grpc.DialOption {
+	if isEnabled {
+		certFile := cmd.CertFile // Certificate authority trust cert
+		creds, err := credentials.NewClientTLSFromFile(certFile, "")
+		if err != nil {
+			log.Fatalf("Error while reading CA trust cert")
+		}
 
-func init() {
-	cmd.Execute()
-	seshTime = cmd.SeshDuration
-	bpf = cmd.BPF
-	netDevices = cmd.NetworkDevices
-	timeOut = 30 * time.Second
-	maxSize = 65535
-	addr, err := myip.GetMyIP()
-	if err != nil {
-		log.Printf("failed to get this ip : %v\n", err)
+		opts := grpc.WithTransportCredentials(creds)
+		return opts
 	}
-	ip = strings.ReplaceAll(addr, " ", "")
-	host = cmd.Host
-}
-
-func filterSpecified() bool {
-	return len(bpf) > 0
-}
-
-func devicesDesignated(n int) bool {
-	return n > 0
+	return grpc.WithInsecure()
 }
 
 func getNetInterfaces() (int, error) {
+	netDevices := cmd.NetworkDevices
 	if len(netDevices) == 0 {
 		devices, err := pcap.FindAllDevs()
 		if err != nil {
@@ -60,71 +48,6 @@ func getNetInterfaces() (int, error) {
 	}
 	return len(netDevices), nil
 }
-
-func logProgress(t time.Timer, pc chan gopacket.Packet) {
-	startTime := time.Now()
-
-	go func() {
-	time_logger:
-		for {
-			select {
-			case <-t.C:
-				break time_logger
-			}
-		}
-	}()
-
-	for {
-		elapsedTime := time.Since(startTime)
-		h, m, s := int(elapsedTime.Hours()), int(elapsedTime.Minutes()), int(elapsedTime.Seconds())
-		time.Sleep(1 * time.Second)
-		fmt.Printf("\r%s", strings.Repeat(" ", 25))
-		fmt.Printf("\rprogress : %dh-%dm-%ds/%v", h, m, s, seshTime)
-	}
-}
-
-func logSessionStart(t time.Timer, pc chan gopacket.Packet, n int) {
-	log.Println("session initialized")
-
-	if filterSpecified() {
-		log.Printf("filter specified : %s\n", bpf)
-	} else {
-		log.Println("no filter specified")
-	}
-
-	if devicesDesignated(n) {
-		log.Printf("sniffing : %v\n", netDevices)
-	} else {
-		log.Println("no device(s) specified - sniffing all")
-	}
-
-	go logProgress(t, pc)
-}
-
-func sniff(d string, pc chan<- gopacket.Packet, tc <-chan time.Time) {
-	handle, err := pcap.OpenLive(d, maxSize, true, timeOut)
-	if err != nil {
-		log.Fatalf("failed to listen to %s : %v\n", d, err)
-	}
-	defer handle.Close()
-
-	if err := handle.SetBPFFilter(bpf); err != nil {
-		log.Fatalf("failed to apply Berkeley Packet filter :\n%s\n%v\n", bpf, err)
-	}
-
-	conn := gopacket.NewPacketSource(handle, handle.LinkType())
-
-sniffer:
-	for {
-		select {
-		case p := <-conn.Packets():
-			pc <- p
-		case <-tc:
-			break sniffer
-		}
-	}
-}
-
 func listen(pc chan gopacket.Packet, t time.Timer, done chan bool) error {
 	tc := t.C
 
@@ -147,64 +70,74 @@ func listen(pc chan gopacket.Packet, t time.Timer, done chan bool) error {
 
 	logSessionStart(t, pc, numDesignated)
 
-	for _, nd := range netDevices {
+	for _, nd := range cmd.NetworkDevices {
 		go sniff(nd, pc, tc)
 	}
 
 	return nil
 }
 
-func main() {
-	conn, err := grpc.Dial(host, grpc.WithInsecure())
+func sniff(d string, pc chan<- gopacket.Packet, tc <-chan time.Time) {
+	handle, err := pcap.OpenLive(d, 65535, true, 30*time.Second)
 	if err != nil {
-		log.Fatalf("failed to establish connection with gRPC server : %v\n", err)
+		log.Fatalf("failed to listen to %s : %v\n", d, err)
 	}
-	defer conn.Close()
+	defer handle.Close()
 
-	client := remcappb.NewRemCapClient(conn)
-	stream, err := client.Sniff(context.Background())
-	if err != nil {
-		log.Fatalf("failed to create sniff stream : %v\n", err)
+	if err := handle.SetBPFFilter(cmd.BPF); err != nil {
+		log.Fatalf("failed to apply Berkeley Packet filter :\n%s\n%v\n", cmd.BPF, err)
 	}
 
-	timer := time.NewTimer(seshTime)
-	pc := make(chan gopacket.Packet)
-	done := make(chan bool)
+	conn := gopacket.NewPacketSource(handle, handle.LinkType())
 
-	if err := listen(pc, *timer, done); err != nil {
-		log.Fatalf("Failed to listen to network interfaces : %v\n", err)
-	}
-
-main_proc:
+sniffer:
 	for {
-	sub_proc:
 		select {
-		case p := <-pc:
-			ii := int32(p.Metadata().InterfaceIndex)
-			if err := stream.Send(&remcappb.Packet{
-				Data:           p.Data(),
-				InterfaceIndex: ii,
-				ExtIP:          ip,
-			}); err == io.EOF {
-				log.Println("premature stream close")
-				break main_proc
-			} else if err != nil {
-				log.Printf("failed to stream packet : %v\n", err)
-				break sub_proc
-			}
-		case <-done:
-			summary, err := stream.CloseAndRecv()
-			if err != nil {
-				log.Printf("Failed to receive summary on close")
-				break main_proc
-			}
-			startTime := time.Unix(summary.GetStartTime(), 0)
-			endTime := time.Unix(summary.GetEndTime(), 0)
-			elapsedTime := endTime.Sub(startTime)
-			pktsCaptured := summary.GetPacketsCaptured()
-			printSummary(startTime, endTime, elapsedTime, pktsCaptured)
-			break main_proc
+		case p := <-conn.Packets():
+			pc <- p
+		case <-tc:
+			break sniffer
 		}
+	}
+}
+
+func logSessionStart(t time.Timer, pc chan gopacket.Packet, n int) {
+	log.Println("session initialized")
+
+	if len(cmd.BPF) > 0 {
+		log.Printf("filter specified : %s\n", cmd.BPF)
+	} else {
+		log.Println("no filter specified")
+	}
+
+	if n > 0 {
+		log.Printf("sniffing : %v\n", cmd.NetworkDevices)
+	} else {
+		log.Println("no device(s) specified - sniffing all")
+	}
+
+	go logProgress(t, pc)
+}
+
+func logProgress(t time.Timer, pc chan gopacket.Packet) {
+	startTime := time.Now()
+
+	go func() {
+	time_logger:
+		for {
+			select {
+			case <-t.C:
+				break time_logger
+			}
+		}
+	}()
+
+	for {
+		elapsedTime := time.Since(startTime)
+		h, m, s := int(elapsedTime.Hours()), int(elapsedTime.Minutes()), int(elapsedTime.Seconds())
+		time.Sleep(1 * time.Second)
+		fmt.Printf("\r%s", strings.Repeat(" ", 25))
+		fmt.Printf("\rprogress : %dh-%dm-%ds/%v", h, m, s, cmd.SeshDuration)
 	}
 }
 
@@ -219,4 +152,67 @@ func printSummary(start, end time.Time, elapsed time.Duration, captured int64) {
 		stat("elapsed", elapsed),
 		stat("pkts captured", captured),
 	}, "\n"))
+}
+
+func main() {
+	cmd.Execute()
+
+	addr, _ := myip.GetMyIP()
+	ip := net.ParseIP(strings.ReplaceAll(addr, "\n", ""))
+	if ip == nil {
+		fmt.Println(addr)
+		log.Fatalf("invalid ip : %v\n", ip)
+	}
+
+	conn, err := grpc.Dial(cmd.Host, getOpts(cmd.EnabledTLS))
+	if err != nil {
+		log.Fatalf("failed to establish connection with gRPC server : %v\n", err)
+	}
+	defer conn.Close()
+
+	client := remcappb.NewRemCapClient(conn)
+	stream, err := client.Sniff(context.Background())
+	if err != nil {
+		log.Fatalf("failed to create sniff stream : %v\n", err)
+	}
+
+	timer := time.NewTimer(cmd.SeshDuration)
+	pc := make(chan gopacket.Packet)
+	done := make(chan bool)
+
+	if err := listen(pc, *timer, done); err != nil {
+		log.Fatalf("Failed to listen to network interfaces : %v\n", err)
+	}
+
+main:
+	for {
+	sub:
+		select {
+		case p := <-pc:
+			ii := int32(p.Metadata().InterfaceIndex)
+			if err := stream.Send(&remcappb.Packet{
+				Data:           p.Data(),
+				InterfaceIndex: ii,
+				ExtIP:          ip.String(),
+			}); err == io.EOF {
+				log.Println("premature stream close")
+				break main
+			} else if err != nil {
+				log.Printf("failed to stream packet : %v\n", err)
+				break sub
+			}
+		case <-done:
+			summary, err := stream.CloseAndRecv()
+			if err != nil {
+				log.Printf("Failed to receive summary on close")
+				break main
+			}
+			startTime := time.Unix(summary.GetStartTime(), 0)
+			endTime := time.Unix(summary.GetEndTime(), 0)
+			elapsedTime := endTime.Sub(startTime)
+			pktsCaptured := summary.GetPacketsCaptured()
+			printSummary(startTime, endTime, elapsedTime, pktsCaptured)
+			break main
+		}
+	}
 }

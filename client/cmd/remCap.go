@@ -12,8 +12,10 @@ var (
 	NetworkDevices          []string
 	seconds, minutes, hours int64
 	SeshDuration            time.Duration
-	minTime                 = 5 * time.Second
-	Host                    string
+	Host, CertFile          string
+	EnabledTLS              bool
+
+	minSeshTime = 5 * time.Second
 
 	remCap = &cobra.Command{
 		Use:   "remcap",
@@ -38,7 +40,7 @@ func getSeshTime() error {
 	if err != nil {
 		return err
 	}
-	if d < minTime {
+	if d < minSeshTime {
 		return fmt.Errorf("Invalid session duration : %v - Session must be at least 5s long\n", d)
 	}
 	SeshDuration = d
@@ -46,7 +48,7 @@ func getSeshTime() error {
 }
 
 func setHost() error {
-	if isSet(Host) {
+	if len(Host) == 0 {
 		return fmt.Errorf("Please specify a host remcap server example : --host <ip>:<port>")
 	}
 	return nil
@@ -62,14 +64,12 @@ func Execute() {
 	}
 }
 
-func isSet(h string) bool {
-	return h == "" || len(h) == 0
-}
-
 func init() {
 	remCap.PersistentFlags().Int64VarP(&seconds, "seconds", "s", 0, "Amount of seconds to run capture")
 	remCap.PersistentFlags().Int64VarP(&minutes, "minutes", "m", 0, "Amount of minutes to run capture")
 	remCap.PersistentFlags().Int64Var(&hours, "hours", 0, "Amount of hours to run capture")
 	remCap.PersistentFlags().StringSliceVarP(&NetworkDevices, "devices", "d", []string{}, "network interface names")
 	remCap.PersistentFlags().StringVar(&Host, "host", "", "Address to stream packets to")
+	remCap.PersistentFlags().BoolVar(&EnabledTLS, "enable", true, "Enable SSL/TLS encryption")
+	remCap.PersistentFlags().StringVar(&CertFile, "cert", "", "path to trust cert from CA")
 }

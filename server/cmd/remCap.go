@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	Port, Out string
+	PrivateKey, CertFile, Port, Out string
+	EnabledTLS                      bool
 
 	remCap = &cobra.Command{
 		Use:   "remcap",
@@ -48,5 +49,8 @@ func Execute() {
 func init() {
 	remCap.PersistentFlags().StringVarP(&Port, "port", "p", "", "Port to start Remcap server ex : --port 4444")
 	remCap.PersistentFlags().StringVarP(&Out, "out", "o", "", "Specify out file")
+	remCap.PersistentFlags().BoolVar(&EnabledTLS, "enable", false, "Enable SSL/TLS encryption")
+	remCap.PersistentFlags().StringVar(&PrivateKey, "private-key", "", "Path to server private key")
+	remCap.PersistentFlags().StringVar(&CertFile, "cert", "", "Path to signed certificate")
 	remCap.MarkFlagRequired("port")
 }
