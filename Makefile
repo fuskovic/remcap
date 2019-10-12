@@ -1,7 +1,6 @@
-# This file helps set up the keys and certificates you need to run remp-cap over a SSL/TLS secured connection.
 
-# step 1: generate private key for CA - ca.key - PRIVATE FILE - DO NOT SHARE
 certs_and_keys :
+# step 1: generate private key for CA - ca.key - PRIVATE FILE - DO NOT SHARE
 	@openssl genrsa -passout pass:${passphrase} -des3 -out ca.key 4096 \
 	
 # step 2: generate trust cert - ca.crt - NEEDED BY CLIENT
@@ -21,3 +20,10 @@ certs_and_keys :
 
 #step 6: convert to pem so our gRPC server can actually use it - server.pem - PRIVATE FILE - DO NOT SHARE
 	@openssl pkcs8 -topk8 -nocrypt -passin pass:${passphrase} -in server.key -out server.pem
+
+## requires passphrase and host arg and running with -i flag
+remcap_server : clean certs_and_keys
+	@go run server/*.go -p 4444 --enable --private-key server.pem --cert server.crt
+
+clean :
+	@rm ca* server.*
