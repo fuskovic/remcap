@@ -67,7 +67,7 @@ func init() {
 	remCap.PersistentFlags().Int64VarP(&seconds, "seconds", "s", 0, "Amount of seconds to run capture")
 	remCap.PersistentFlags().Int64VarP(&minutes, "minutes", "m", 0, "Amount of minutes to run capture")
 	remCap.PersistentFlags().Int64Var(&hours, "hours", 0, "Amount of hours to run capture")
-	remCap.PersistentFlags().StringSliceVarP(&NetworkDevices, "devices", "d", []string{}, "network interface names")
-	remCap.PersistentFlags().StringVar(&Host, "host", "", "Address to stream packets to")
-	remCap.PersistentFlags().StringVar(&CertFile, "cert", "", "path to trust cert from CA")
+	remCap.PersistentFlags().StringSliceVarP(&NetworkDevices, "devices", "d", []string{}, "Network interfaces to sniff ( comma-separated )")
+	remCap.PersistentFlags().StringVar(&Host, "host", "", "<ip>:<port> of host to stream packets to")
+	remCap.PersistentFlags().StringVar(&CertFile, "cert", "", "Path to trust certificate")
 }

@@ -1,4 +1,3 @@
-
 certs_and_keys :
 # step 1: generate private key for CA - ca.key - PRIVATE FILE - DO NOT SHARE
 	@openssl genrsa -passout pass:${pw} -des3 -out ca.key 4096 \

@@ -46,9 +46,9 @@ func Execute() {
 }
 
 func init() {
-	remCap.PersistentFlags().StringVarP(&Port, "port", "p", "", "Port to start Remcap server ex : --port 4444")
-	remCap.PersistentFlags().StringVarP(&Out, "out", "o", "", "Specify out file")
-	remCap.PersistentFlags().StringVar(&CertFile, "cert", "", "Path to cert")
-	remCap.PersistentFlags().StringVar(&PrivateKey, "key", "", "Path to private key")
+	remCap.PersistentFlags().StringVarP(&Port, "port", "p", "", "Port to start remcap server")
+	remCap.PersistentFlags().StringVarP(&Out, "out", "o", "", "Specify out file name")
+	remCap.PersistentFlags().StringVar(&CertFile, "cert", "", "Path to signed certificate")
+	remCap.PersistentFlags().StringVar(&PrivateKey, "key", "", "Path to server private key")
 	remCap.MarkFlagRequired("port")
 }

