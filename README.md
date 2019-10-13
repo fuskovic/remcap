@@ -8,14 +8,14 @@ Remotely capture network packets using a client-streaming gRPC API.
 
 The attack box runs the gRPC server.
 
-Once the attacker has rooted the target machine, he/she `scp`'s the client binary over from the attack box.
+Once the attacker has rooted the target machine, he/she `scp`'s the client binary and the trust certificate over from the attack box.
 
 The attacker runs the client binary on the target machine specifying : 
 
 - which network interfaces he/she would like to packet sniff
 - the amount of time to sniff packets on those interfaces
 - the address and port the attack box is running the gRPC server to stream sniffed packets to
-- whether or not to secure the connection with SSL/TLS
+- the path to the certificate
 
 The server keeps track of which packets came from which client stream.
 
