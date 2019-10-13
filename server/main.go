@@ -13,21 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-func configServer(isEnabled bool) *grpc.Server {
-	if isEnabled {
-		certFile := cmd.CertFile  //server.crt
-		keyFile := cmd.PrivateKey //server.pem
-
-		creds, err := credentials.NewServerTLSFromFile(certFile, keyFile)
-		if err != nil {
-			log.Fatalf("failed to load certificate and or key, err : %v\n", err)
-		}
-		opts := grpc.Creds(creds)
-		return grpc.NewServer(opts)
-	}
-	return grpc.NewServer()
-}
-
 func main() {
 	cmd.Execute()
 	port := fmt.Sprintf(":%s", cmd.Port)
@@ -37,7 +22,13 @@ func main() {
 		log.Fatalf("Failed to listen on port %s : %v\n", port, err)
 	}
 
-	s := configServer(cmd.EnabledTLS)
+	creds, err := credentials.NewServerTLSFromFile(cmd.CertFile, cmd.PrivateKey)
+	if err != nil {
+		log.Fatalf("failed to load certificate and or key, err : %v\n", err)
+	}
+	opts := grpc.Creds(creds)
+	s := grpc.NewServer(opts)
+
 	remcappb.RegisterRemCapServer(s, &server{})
 
 	fmt.Printf("remcap server running on %s\n", port)

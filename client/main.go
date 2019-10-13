@@ -19,18 +19,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-func getOpts(isEnabled bool) grpc.DialOption {
-	if isEnabled {
-		certFile := cmd.CertFile // Certificate authority trust cert
-		creds, err := credentials.NewClientTLSFromFile(certFile, "")
-		if err != nil {
-			log.Fatalf("Error while reading CA trust cert")
-		}
-
-		opts := grpc.WithTransportCredentials(creds)
-		return opts
+func getOpts() grpc.DialOption {
+	creds, err := credentials.NewClientTLSFromFile(cmd.CertFile, "")
+	if err != nil {
+		log.Fatalf("failed to load cert file : %v\n", err)
 	}
-	return grpc.WithInsecure()
+	opts := grpc.WithTransportCredentials(creds)
+	return opts
 }
 
 func getNetInterfaces() (int, error) {
@@ -164,7 +159,7 @@ func main() {
 		log.Fatalf("invalid ip : %v\n", ip)
 	}
 
-	conn, err := grpc.Dial(cmd.Host, getOpts(cmd.EnabledTLS))
+	conn, err := grpc.Dial(cmd.Host, getOpts())
 	if err != nil {
 		log.Fatalf("failed to establish connection with gRPC server : %v\n", err)
 	}

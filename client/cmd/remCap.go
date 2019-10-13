@@ -13,7 +13,6 @@ var (
 	seconds, minutes, hours int64
 	SeshDuration            time.Duration
 	Host, CertFile          string
-	EnabledTLS              bool
 
 	minSeshTime = 5 * time.Second
 
@@ -70,6 +69,5 @@ func init() {
 	remCap.PersistentFlags().Int64Var(&hours, "hours", 0, "Amount of hours to run capture")
 	remCap.PersistentFlags().StringSliceVarP(&NetworkDevices, "devices", "d", []string{}, "network interface names")
 	remCap.PersistentFlags().StringVar(&Host, "host", "", "Address to stream packets to")
-	remCap.PersistentFlags().BoolVar(&EnabledTLS, "enable", true, "Enable SSL/TLS encryption")
 	remCap.PersistentFlags().StringVar(&CertFile, "cert", "", "path to trust cert from CA")
 }
