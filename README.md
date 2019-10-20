@@ -60,7 +60,7 @@ All generated certificates and keys will be saved into a new `ssl/` dir and all 
 ## Running The Client :
 
 
-    ./remcap -s 10 -d en0 --host $(curl ifconfig.me):4444 --cert ssl/ca.crt 
+    ./remcap -s 10 -d en0 --host <address>:4444 --cert ssl/ca.crt 
 
 
 The above example would sniff the en0 interface for 10 seconds and stream any packets captured to the server running at the address specified on port 4444. The cert is used to TLS-secure the connection.
