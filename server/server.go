@@ -12,7 +12,6 @@ import (
 	"github.com/fuskovic/rem-cap/server/cmd"
 
 	remcappb "github.com/fuskovic/rem-cap/proto"
-	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 )
@@ -48,7 +47,7 @@ func (s *server) Sniff(stream remcappb.RemCap_SniffServer) error {
 		}
 		c.IP = req.GetExtIP()
 		ii := int(req.GetInterfaceIndex())
-		c.addPacket(req.GetData(), layers.LayerTypeEthernet, gopacket.Default, ii)
+		c.addPacket(req.GetData(), layers.LayerTypeEthernet, ii)
 		c.isConnected = true
 		status <- c
 	}

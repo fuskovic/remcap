@@ -27,8 +27,8 @@ type connection struct {
 
 type connections []connection
 
-func (c *connection) addPacket(data []byte, layer gopacket.LayerType, opts gopacket.DecodeOptions, ii int) {
-	pkt := gopacket.NewPacket(data, layer, opts)
+func (c *connection) addPacket(data []byte, layer gopacket.LayerType, ii int) {
+	pkt := gopacket.NewPacket(data, layer, gopacket.Default)
 	capLen := len(data)
 
 	pkt.Metadata().CaptureInfo = gopacket.CaptureInfo{

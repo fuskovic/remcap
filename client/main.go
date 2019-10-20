@@ -43,19 +43,18 @@ func getNetInterfaces() (int, error) {
 	}
 	return len(netDevices), nil
 }
+
 func listen(pc chan gopacket.Packet, t time.Timer, done chan bool) error {
 	tc := t.C
 
 	go func() {
-	listener:
 		for {
 			select {
 			case <-tc:
 				done <- true
-				break listener
+				break
 			}
 		}
-		return
 	}()
 
 	numDesignated, err := getNetInterfaces()
@@ -85,13 +84,12 @@ func sniff(d string, pc chan<- gopacket.Packet, tc <-chan time.Time) {
 
 	conn := gopacket.NewPacketSource(handle, handle.LinkType())
 
-sniffer:
 	for {
 		select {
 		case p := <-conn.Packets():
 			pc <- p
 		case <-tc:
-			break sniffer
+			break
 		}
 	}
 }
@@ -118,11 +116,10 @@ func logProgress(t time.Timer, pc chan gopacket.Packet) {
 	startTime := time.Now()
 
 	go func() {
-	time_logger:
 		for {
 			select {
 			case <-t.C:
-				break time_logger
+				break
 			}
 		}
 	}()
@@ -155,8 +152,7 @@ func main() {
 	addr, _ := myip.GetMyIP()
 	ip := net.ParseIP(strings.ReplaceAll(addr, "\n", ""))
 	if ip == nil {
-		fmt.Println(addr)
-		log.Fatalf("invalid ip : %v\n", ip)
+		log.Fatalf("invalid ip : %v\n", addr)
 	}
 
 	conn, err := grpc.Dial(cmd.Host, getOpts())
