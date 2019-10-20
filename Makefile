@@ -20,12 +20,28 @@ certs_and_keys :
 #step 6: convert to pem so our gRPC server can actually use it - server.pem - PRIVATE FILE - DO NOT SHARE
 	@openssl pkcs8 -topk8 -nocrypt -passin pass:${pw} -in server.key -out server.pem
 
-## required args : pw and host
+# delete certs, keys, and binaries
+clean :
+	@rm -rf ssl || true && \
+	rm remcap* || true
+
+# required args : pw ( passphrase used for key and cert generation ) and host ( address gRPC server is running on)
 remcap : clean certs_and_keys
 	@go build -o remcap client/main.go && \
 	go build -o remcap_server server/*.go && \
 	mkdir ssl/ && mv ca* ssl/ && mv server.* ssl/
 
-clean :
-	@rm -rf ssl || true && \
-	rm remcap* || true
+# run a containerized remcap server
+remcap_container : 
+	@docker run -p 4444:4444 --rm -d --name remcap_server remcap
+
+interactive :
+	@docker exec -it remcap_server /bin/sh
+
+container_address :
+	@docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' remcap_server
+
+# run containerized server, copy the container generated certificate to host, and build the client binary
+ready : remcap_container
+	@docker cp remcap_server:/app/rem-cap/ssl/ca.crt . && \
+	go build -o remcap client/main.go
