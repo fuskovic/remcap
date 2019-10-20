@@ -41,10 +41,6 @@ The pcap file can then be analyzed in wireshark or some other pcap analyzing too
 
 clone this repo
 
-Install dependencies : 
-
-    go get ./...
-
 The creation of certificates, keys, and both remcap binaries ( server and client ) can be automated with the `remcap` target in the Makefile.
 
 The make target requires pw and host args for key and cert generation
@@ -54,6 +50,8 @@ The make target requires pw and host args for key and cert generation
     make remcap pw=test host=localhost
 
 All generated certificates and keys will be saved into a new `ssl/` dir.
+
+Note : The go mod will automatically install all go dependencies on build.
 
 ## Server Usage
 
