@@ -1,3 +1,4 @@
+# Generate certificates and keys for establishing a secure connection
 certs_and_keys :
 # step 1: generate private key for CA - ca.key - PRIVATE FILE - DO NOT SHARE
 	@openssl genrsa -passout pass:${pw} -des3 -out ca.key 4096 \
@@ -20,28 +21,25 @@ certs_and_keys :
 #step 6: convert to pem so our gRPC server can actually use it - server.pem - PRIVATE FILE - DO NOT SHARE
 	@openssl pkcs8 -topk8 -nocrypt -passin pass:${pw} -in server.key -out server.pem
 
+# build server and client executables
+binaries :
+	@go build -o remcap client/main.go && \
+	go build -o remcap_server server/*.go
+
+# generate certs and keys and move them to an ssl dir then build server and client binaries
+remcap : clean certs_and_keys binaries
+	@mkdir ssl/ && mv ca* ssl/ && mv server.* ssl/
+
+# run containerized server, copy the container generated certificate to host, and build the client binary
+ready :
+	@docker run -p 80:80 --rm -d --name remcap_server fuskovic/remcap:2.1 && \
+	go build -o remcap client/main.go
+
+# shell into container
+interactive :
+	@docker exec -it remcap_server /bin/sh
+
 # delete certs, keys, and binaries
 clean :
 	@rm -rf ssl || true && \
 	rm remcap* || true
-
-# required args : pw ( passphrase used for key and cert generation ) and host ( address gRPC server is running on)
-remcap : clean certs_and_keys
-	@go build -o remcap client/main.go && \
-	go build -o remcap_server server/*.go && \
-	mkdir ssl/ && mv ca* ssl/ && mv server.* ssl/
-
-# run a containerized remcap server
-remcap_container : 
-	@docker run -p 4444:4444 --rm -d --name remcap_server remcap
-
-interactive :
-	@docker exec -it remcap_server /bin/sh
-
-container_address :
-	@docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' remcap_server
-
-# run containerized server, copy the container generated certificate to host, and build the client binary
-ready : remcap_container
-	@docker cp remcap_server:/app/rem-cap/ssl/ca.crt . && \
-	go build -o remcap client/main.go

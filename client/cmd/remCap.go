@@ -13,8 +13,8 @@ var (
 	seconds, minutes, hours int64
 	SeshDuration            time.Duration
 	Host, CertFile          string
-
-	minSeshTime = 5 * time.Second
+	IsSecure                bool
+	minSeshTime             = 5 * time.Second
 
 	remCap = &cobra.Command{
 		Use:   "remcap",
@@ -70,4 +70,5 @@ func init() {
 	remCap.PersistentFlags().StringSliceVarP(&NetworkDevices, "devices", "d", []string{}, "Network interfaces to sniff ( comma-separated )")
 	remCap.PersistentFlags().StringVar(&Host, "host", "", "<ip>:<port> of host to stream packets to")
 	remCap.PersistentFlags().StringVar(&CertFile, "cert", "", "Path to trust certificate")
+	remCap.PersistentFlags().BoolVar(&IsSecure, "enable-tls", false, "Secure connection with SSL/TLS")
 }

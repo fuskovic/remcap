@@ -22,12 +22,18 @@ func main() {
 		log.Fatalf("Failed to listen on port %s : %v\n", port, err)
 	}
 
-	creds, err := credentials.NewServerTLSFromFile(cmd.CertFile, cmd.PrivateKey)
-	if err != nil {
-		log.Fatalf("failed to load certificate and or key, err : %v\n", err)
+	var s *grpc.Server
+
+	if cmd.IsSecure {
+		creds, err := credentials.NewServerTLSFromFile(cmd.CertFile, cmd.PrivateKey)
+		if err != nil {
+			log.Fatalf("failed to load certificate and or key, err : %v\n", err)
+		}
+		opts := grpc.Creds(creds)
+		s = grpc.NewServer(opts)
+	} else {
+		s = grpc.NewServer()
 	}
-	opts := grpc.Creds(creds)
-	s := grpc.NewServer(opts)
 
 	remcappb.RegisterRemCapServer(s, &server{})
 

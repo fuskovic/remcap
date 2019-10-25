@@ -18,6 +18,6 @@ RUN git clone https://github.com/fuskovic/rem-cap
 
 WORKDIR /app/rem-cap/
 
-RUN make remcap host=$(curl ifconfig.me) pw=$(openssl rand -base64 32)
+RUN make binaries
 
-CMD ./remcap_server --cert=ssl/server.crt --key=ssl/server.pem -p 4444
+CMD ./remcap_server -p 80

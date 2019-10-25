@@ -10,6 +10,7 @@ import (
 
 var (
 	Port, Out, CertFile, PrivateKey string
+	IsSecure                        bool
 
 	remCap = &cobra.Command{
 		Use:   "remcap",
@@ -50,5 +51,6 @@ func init() {
 	remCap.PersistentFlags().StringVarP(&Out, "out", "o", "", "Specify out file name")
 	remCap.PersistentFlags().StringVar(&CertFile, "cert", "", "Path to signed certificate")
 	remCap.PersistentFlags().StringVar(&PrivateKey, "key", "", "Path to server private key")
+	remCap.PersistentFlags().BoolVar(&IsSecure, "enable-tls", false, "Secure connection with SSL/TLS")
 	remCap.MarkFlagRequired("port")
 }
