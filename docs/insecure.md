@@ -1,4 +1,6 @@
-### Building
+# With an Insecure Connection
+
+## Building
 
 The remcap target provided named `binaries` automates building the client and server executables.
 

@@ -9,9 +9,10 @@ Remotely capture network packets using a client-streaming gRPC API.
 - [Client](#client)
 
 ### Ways to Use
-- [With an SSL/TLS secured connection](https://github.com/fuskovic/remcap/docs/secure.md)
-- [Insecure connection](https://github.com/fuskovic/remcap/docs/insecure.md)
-- [Docker](https://github.com/fuskovic/remcap/docs/docker.md)
+https://github.com/fuskovic/remcap/blob/master/docs/docker.md
+- [With an SSL/TLS secured connection](https://github.com/fuskovic/remcap/blob/master/docs/secure.md)
+- [Insecure connection](https://github.com/fuskovic/remcap/blob/master/docs/insecure.md)
+- [Docker](https://github.com/fuskovic/remcap/blob/master/docs/docker.md)
 
 ## How it works
 

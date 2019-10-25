@@ -1,4 +1,4 @@
-# With SSL/TLS secured connection
+# With a SSL/TLS secured connection
 
 ### Building
 

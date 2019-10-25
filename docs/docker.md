@@ -1,5 +1,4 @@
-
-# Docker
+# With Docker
 
 ## Building and Running the Server
 
