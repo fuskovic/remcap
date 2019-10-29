@@ -18,7 +18,7 @@ Remotely capture network packets using a client-streaming gRPC API.
 
 The server binary runs on your machine and is responsible for receiving packets and outputting pcaps.
 
-The client binary runs on the remote target spefifying :
+The client binary runs on the remote target specifying :
 
 - which network interfaces to sniff
 - the amount of time to sniff
