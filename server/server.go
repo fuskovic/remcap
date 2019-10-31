@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"io"
 	"log"
 	"net"
@@ -21,8 +22,9 @@ type server struct {
 }
 
 func (s *server) Sniff(stream remcappb.RemCap_SniffServer) error {
+	ctx, cancel := context.WithCancel(context.Background())
 	status := make(chan connection)
-	go s.logStatus(status)
+	go s.logStatus(ctx, status)
 	c := connection{
 		start: time.Now(),
 	}
@@ -37,12 +39,14 @@ func (s *server) Sniff(stream remcappb.RemCap_SniffServer) error {
 			if err := s.sendSummary(c, stream, status); err != nil {
 				log.Fatalf("failed to send summary : %v\n", err)
 			}
+			cancel()
 			break
 		} else if err != nil {
 			ip := net.ParseIP(req.GetExtIP()).String()
 			log.Printf("Stream error - %s has disconnected: %v\n", ip, err)
 			c.isConnected = false
 			status <- c
+			cancel()
 			return err
 		}
 		c.IP = req.GetExtIP()
@@ -94,12 +98,14 @@ func (s *server) isRegistered(conn connection) bool {
 	return false
 }
 
-func (s *server) logStatus(cc chan connection) {
+func (s *server) logStatus(ctx context.Context, cc chan connection) {
 	for {
 		select {
 		case c := <-cc:
 			clear()
 			c.logStats()
+		case <-ctx.Done():
+			break
 		}
 	}
 }

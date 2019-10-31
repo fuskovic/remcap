@@ -15,7 +15,7 @@ import (
 	remcappb "github.com/fuskovic/rem-cap/proto"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
-	"github.com/polds/MyIP"
+	myip "github.com/polds/MyIP"
 	"google.golang.org/grpc"
 )
 
@@ -47,34 +47,22 @@ func getNetInterfaces() (int, error) {
 	return len(netDevices), nil
 }
 
-func listen(pc chan gopacket.Packet, t time.Timer, done chan bool) error {
-	tc := t.C
-
-	go func() {
-		for {
-			select {
-			case <-tc:
-				done <- true
-				break
-			}
-		}
-	}()
-
+func listen(ctx context.Context, pc chan gopacket.Packet) error {
 	numDesignated, err := getNetInterfaces()
 	if err != nil {
 		return err
 	}
 
-	logSessionStart(t, pc, numDesignated)
+	logSessionStart(ctx, pc, numDesignated)
 
 	for _, nd := range cmd.NetworkDevices {
-		go sniff(nd, pc, tc)
+		go sniff(ctx, nd, pc)
 	}
 
 	return nil
 }
 
-func sniff(d string, pc chan<- gopacket.Packet, tc <-chan time.Time) {
+func sniff(ctx context.Context, d string, pc chan<- gopacket.Packet) {
 	handle, err := pcap.OpenLive(d, 65535, true, 30*time.Second)
 	if err != nil {
 		log.Fatalf("failed to listen to %s : %v\n", d, err)
@@ -91,13 +79,13 @@ func sniff(d string, pc chan<- gopacket.Packet, tc <-chan time.Time) {
 		select {
 		case p := <-conn.Packets():
 			pc <- p
-		case <-tc:
+		case <-ctx.Done():
 			break
 		}
 	}
 }
 
-func logSessionStart(t time.Timer, pc chan gopacket.Packet, n int) {
+func logSessionStart(ctx context.Context, pc chan gopacket.Packet, n int) {
 	log.Println("session initialized")
 
 	if len(cmd.BPF) > 0 {
@@ -112,27 +100,23 @@ func logSessionStart(t time.Timer, pc chan gopacket.Packet, n int) {
 		log.Println("no device(s) specified - sniffing all")
 	}
 
-	go logProgress(t, pc)
+	go logProgress(ctx, pc)
 }
 
-func logProgress(t time.Timer, pc chan gopacket.Packet) {
+func logProgress(ctx context.Context, pc chan gopacket.Packet) {
 	startTime := time.Now()
 
-	go func() {
-		for {
-			select {
-			case <-t.C:
-				break
-			}
-		}
-	}()
-
 	for {
-		elapsedTime := time.Since(startTime)
-		h, m, s := int(elapsedTime.Hours()), int(elapsedTime.Minutes()), int(elapsedTime.Seconds())
-		time.Sleep(1 * time.Second)
-		fmt.Printf("\r%s", strings.Repeat(" ", 25))
-		fmt.Printf("\rprogress : %dh-%dm-%ds/%v", h, m, s, cmd.SeshDuration)
+		select {
+		case <-ctx.Done():
+			break
+		default:
+			elapsedTime := time.Since(startTime)
+			time.Sleep(500 * time.Millisecond)
+			h, m, s := int(elapsedTime.Hours()), int(elapsedTime.Minutes()), int(elapsedTime.Seconds())
+			fmt.Printf("\r%s", strings.Repeat(" ", 25))
+			fmt.Printf("\rprogress : %dh-%dm-%ds/%v", h, m, s, cmd.SeshDuration)
+		}
 	}
 }
 
@@ -141,7 +125,7 @@ func printSummary(start, end time.Time, elapsed time.Duration, captured int64) {
 		return fmt.Sprintf("%s : %v", stat, value)
 	}
 	fmt.Println(strings.Join([]string{
-		"Capture session terminated",
+		"\nCapture session terminated",
 		stat("start", start),
 		stat("end", end),
 		stat("elapsed", elapsed),
@@ -151,6 +135,9 @@ func printSummary(start, end time.Time, elapsed time.Duration, captured int64) {
 
 func main() {
 	cmd.Execute()
+	parentCtx := context.Background()
+	ctx, cancel := context.WithTimeout(parentCtx, cmd.SeshDuration)
+	defer cancel()
 
 	addr, _ := myip.GetMyIP()
 	ip := net.ParseIP(strings.ReplaceAll(addr, "\n", ""))
@@ -165,22 +152,19 @@ func main() {
 	defer conn.Close()
 
 	client := remcappb.NewRemCapClient(conn)
-	stream, err := client.Sniff(context.Background())
+	stream, err := client.Sniff(parentCtx)
 	if err != nil {
 		log.Fatalf("failed to create sniff stream : %v\n", err)
 	}
 
-	timer := time.NewTimer(cmd.SeshDuration)
 	pc := make(chan gopacket.Packet)
-	done := make(chan bool)
 
-	if err := listen(pc, *timer, done); err != nil {
+	if err := listen(ctx, pc); err != nil {
 		log.Fatalf("Failed to listen to network interfaces : %v\n", err)
 	}
 
-main:
+loop:
 	for {
-	sub:
 		select {
 		case p := <-pc:
 			ii := int32(p.Metadata().InterfaceIndex)
@@ -190,23 +174,21 @@ main:
 				ExtIP:          ip.String(),
 			}); err == io.EOF {
 				log.Println("premature stream close")
-				break main
 			} else if err != nil {
 				log.Printf("failed to stream packet : %v\n", err)
-				break sub
 			}
-		case <-done:
+		case <-ctx.Done():
 			summary, err := stream.CloseAndRecv()
 			if err != nil {
-				log.Printf("Failed to receive summary on close")
-				break main
+				log.Printf("Failed to receive summary on close : %v\n", err)
+				break loop
 			}
 			startTime := time.Unix(summary.GetStartTime(), 0)
 			endTime := time.Unix(summary.GetEndTime(), 0)
 			elapsedTime := endTime.Sub(startTime)
 			pktsCaptured := summary.GetPacketsCaptured()
 			printSummary(startTime, endTime, elapsedTime, pktsCaptured)
-			break main
+			break loop
 		}
 	}
 }
